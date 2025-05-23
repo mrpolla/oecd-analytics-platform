@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.env
+venv/
+
+# Data files
+*.csv
+*.json
+data/
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+logs/
+
+# MinIO data
+.minio/
