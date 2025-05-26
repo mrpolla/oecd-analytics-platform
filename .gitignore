@@ -1,21 +1,71 @@
-# Python
+# Python bytecode and virtual environments
 __pycache__/
 *.py[cod]
-.env
+*.pyo
+*.pyd
+.venv/
 venv/
 
-# Data files
-*.csv
-*.json
-data/
+# Jupyter / IPython
+.ipynb_checkpoints/
 
-# IDE
-.idea/
+# Environment variables
+.env
+.env.*
+
+# IDE and editor settings
 .vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
 
 # Logs
 *.log
 logs/
 
-# MinIO data
+# Docker volumes / runtime data
+infrastructure/docker/minio-data/
+infrastructure/docker/nifi-data/
+infrastructure/docker/nifi-flow.xml.gz
 .minio/
+
+# Data files
+*.sqlite
+*.db
+*.csv
+*.json
+*.parquet
+data/
+
+# Local development artifacts
+*.bak
+*.swp
+*.tmp
+
+# Uvicorn / FastAPI cache
+*.pid
+
+# Frontend build artifacts
+frontend/build/
+frontend/node_modules/
+frontend/.env.local
+frontend/.cache/
+
+# Python packaging
+*.egg-info/
+dist/
+build/
+
+# Test and coverage outputs
+.pytest_cache/
+.cache/
+coverage.xml
+htmlcov/
+
+# Output artifacts
+*.pdf
+*.zip
+*.tar.gz
+README.md
