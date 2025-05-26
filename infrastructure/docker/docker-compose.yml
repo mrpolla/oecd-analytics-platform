@@ -1,10 +1,24 @@
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: oecd-postgres
+    environment:
+      POSTGRES_USER: oecd_user
+      POSTGRES_PASSWORD: oecd_password
+      POSTGRES_DB: oecd_analytics
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - oecd-network
+
   minio:
     image: minio/minio:latest
     container_name: oecd-minio
     ports:
-      - "9000:9000" # API port
-      - "9001:9001" # Web Console port
+      - "9000:9000"
+      - "9001:9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin123
@@ -20,17 +34,62 @@ services:
       - oecd-network
 
   nifi:
-    image: apache/nifi:1.24.0
+    image: apache/nifi:1.19.1
     container_name: oecd-nifi
     ports:
-      - "8443:8443" # NiFi web interface (HTTPS)
+      - "8080:8080"
     environment:
-      - NIFI_WEB_HTTPS_PORT=8443
+      - NIFI_WEB_HTTP_PORT=8080
       - SINGLE_USER_CREDENTIALS_USERNAME=admin
       - SINGLE_USER_CREDENTIALS_PASSWORD=adminpassword123
+    volumes:
+      - nifi-database:/opt/nifi/nifi-current/database_repository
+      - nifi-flowfile:/opt/nifi/nifi-current/flowfile_repository
+      - nifi-content:/opt/nifi/nifi-current/content_repository
+      - nifi-provenance:/opt/nifi/nifi-current/provenance_repository
+      - nifi-state:/opt/nifi/nifi-current/state
+    networks:
+      - oecd-network
+
+  api:
+    build: ../../microservices/api
+    container_name: oecd-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.docker
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=oecd_user
+      - POSTGRES_PASSWORD=oecd_password
+      - POSTGRES_DB=oecd_analytics
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - SECRET_KEY=your-secret-key-change-this-in-production
+    depends_on:
+      - postgres
+      - minio
+    networks:
+      - oecd-network
+
+  web:
+    build: ../../frontend/oecd-dashboard
+    container_name: oecd-web
+    ports:
+      - "80:80"
     networks:
       - oecd-network
 
 networks:
   oecd-network:
     driver: bridge
+
+volumes:
+  postgres-data:
+  nifi-database:
+  nifi-flowfile:
+  nifi-content:
+  nifi-provenance:
+  nifi-state:

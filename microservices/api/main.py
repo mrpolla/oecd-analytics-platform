@@ -10,6 +10,49 @@ import os
 from dotenv import load_dotenv
 from datetime import datetime
 import pandas as pd
+from fastapi import FastAPI, HTTPException, Query, Depends, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from datetime import datetime, timedelta
+import jwt
+from pydantic import BaseModel
+
+# Security
+security = HTTPBearer()
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this")
+ALGORITHM = "HS256"
+
+# Login model
+class LoginForm(BaseModel):
+    username: str
+    password: str
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    """Create JWT token"""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(hours=24)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Verify JWT token"""
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired"
+        )
+    except jwt.JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials"
+        )
 
 # Load environment variables
 load_dotenv()
@@ -39,6 +82,18 @@ def get_db_connection():
         user=os.getenv("POSTGRES_USER"),
         password=os.getenv("POSTGRES_PASSWORD"),
         cursor_factory=RealDictCursor
+    )
+
+# Add the login endpoint
+@app.post("/auth/login")
+def login(username: str = Query(...), password: str = Query(...)):
+    """Login endpoint"""
+    if username == "bundesdruckerei" and password == "demo123":
+        access_token = create_access_token(data={"sub": username})
+        return {"access_token": access_token, "token_type": "bearer"}
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Incorrect username or password"
     )
 
 @app.get("/")
@@ -131,7 +186,7 @@ def compare_productivity(
             return comparison
     finally:
         conn.close()
-        
+
 @app.get("/productivity/{country_code}")
 def get_country_productivity(
     country_code: str,
