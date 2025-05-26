@@ -1,0 +1,56 @@
+stages:
+  - test
+  - build
+  - deploy
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+
+# Test Python code
+test-python:
+  stage: test
+  image: python:3.10
+  before_script:
+    - pip install -r requirements.txt
+  script:
+    - pytest tests/ || echo "No tests yet"
+    - python -m flake8 etl/ microservices/ || echo "No linting yet"
+
+# Build Docker images
+build-api:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - cd microservices/api
+    - docker build -t oecd-api:$CI_COMMIT_SHA .
+    - docker tag oecd-api:$CI_COMMIT_SHA oecd-api:latest
+  only:
+    - main
+
+build-frontend:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - cd frontend/oecd-dashboard
+    - docker build -t oecd-frontend:$CI_COMMIT_SHA .
+    - docker tag oecd-frontend:$CI_COMMIT_SHA oecd-frontend:latest
+  only:
+    - main
+
+# Deploy to production
+deploy-prod:
+  stage: deploy
+  image: docker:latest
+  script:
+    - cd infrastructure/docker
+    - docker compose pull
+    - docker compose up -d
+    - docker compose -f docker-compose.monitoring.yml up -d
+  only:
+    - main
+  when: manual

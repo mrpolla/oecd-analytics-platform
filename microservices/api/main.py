@@ -15,6 +15,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime, timedelta
 import jwt
 from pydantic import BaseModel
+from prometheus_fastapi_instrumentator import Instrumentator
 
 # Security
 security = HTTPBearer()
@@ -63,6 +64,9 @@ app = FastAPI(
     description="API for accessing OECD productivity and economic data",
     version="1.0.0"
 )
+
+instrumentator = Instrumentator()
+instrumentator.instrument(app).expose(app)
 
 # Add CORS middleware
 app.add_middleware(
