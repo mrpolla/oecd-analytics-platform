@@ -1,25 +1,26 @@
 services:
   jenkins:
-    image: jenkins/jenkins:lts
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.jenkins
     container_name: oecd-jenkins
-    privileged: true
-    user: root
     ports:
       - "8090:8080"
       - "50000:50000"
     volumes:
-      - jenkins-data:/var/jenkins_home
+      - jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
-      - /usr/bin/docker:/usr/bin/docker
-    # environment:
-    #   - JENKINS_OPTS="--prefix=/jenkins"
+      - ../../:/workspace/oecd-analytics-platform
+    environment:
+      - JENKINS_OPTS=--httpPort=8080
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
     networks:
       - oecd-network
+    restart: unless-stopped
 
 volumes:
-  jenkins-data:
+  jenkins_home:
 
 networks:
   oecd-network:
-    external: true
-    name: docker_oecd-network
+    driver: bridge

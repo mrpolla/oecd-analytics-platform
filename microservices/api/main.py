@@ -1,21 +1,23 @@
 """
 OECD Analytics API Microservice
 """
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from datetime import datetime, timedelta
 from typing import List, Optional
+from pydantic import BaseModel
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
-from dotenv import load_dotenv
-from datetime import datetime
-import pandas as pd
-from fastapi import FastAPI, HTTPException, Query, Depends, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from datetime import datetime, timedelta
-import jwt
-from pydantic import BaseModel
+import time
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from prometheus_fastapi_instrumentator import Instrumentator
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from dotenv import load_dotenv
 
 # Security
 security = HTTPBearer()
@@ -111,7 +113,9 @@ def read_root():
             "/industries",
             "/productivity/{country_code}",
             "/productivity/compare",
-            "/trends/{country_code}"
+            "/trends/{country_code}",
+            "/health",
+            "/ready"
         ]
     }
 
@@ -325,6 +329,52 @@ def get_germany_summary():
     finally:
         conn.close()
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring"""
+    try:
+        # Check database connectivity
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        return {
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "version": "1.0.0",
+            "database": "connected"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Service unhealthy: {str(e)}"
+        )
+
+@app.get("/ready")
+async def readiness_check():
+    """Readiness check for Kubernetes/container orchestration"""
+    try:
+        # Check if all dependencies are ready
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM oecd_productivity")
+        count = cursor.fetchone()[0]
+        cursor.close()
+        conn.close()
+        
+        if count > 0:
+            return {"status": "ready", "data_count": count}
+        else:
+            raise HTTPException(status_code=503, detail="No data available")
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Service not ready: {str(e)}"
+        )
+    
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

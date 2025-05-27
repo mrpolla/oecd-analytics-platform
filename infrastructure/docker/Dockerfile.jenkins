@@ -1,0 +1,57 @@
+# infrastructure/docker/Dockerfile.jenkins
+FROM jenkins/jenkins:lts
+
+# Switch to root to install packages
+USER root
+
+# Install Python, Node.js, and other dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    curl \
+    wget \
+    gnupg \
+    lsb-release \
+    ca-certificates
+
+# Install Node.js 18
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs
+
+# Install Docker CLI (for Docker-in-Docker)
+RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
+    && apt-get update \
+    && apt-get install -y docker-ce-cli
+
+# Install Docker Compose
+RUN curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose \
+    && chmod +x /usr/local/bin/docker-compose
+
+# Create Python symlink
+RUN ln -s /usr/bin/python3 /usr/bin/python
+
+# Install Chrome for Selenium tests
+RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update \
+    && apt-get install -y google-chrome-stable
+
+# Install ChromeDriver
+# ChromeDriver will be managed by webdriver-manager in Python tests
+
+# Switch back to jenkins user
+USER jenkins
+
+# Install Jenkins plugins
+RUN jenkins-plugin-cli --plugins \
+    workflow-aggregator \
+    docker-workflow \
+    pipeline-stage-view \
+    blueocean \
+    junit \
+    htmlpublisher \
+    cucumber-reports \
+    prometheus \
+    pipeline-utility-steps
